@@ -4,19 +4,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+ # (Tray icon removed)
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMenu,
     QPushButton,
-    QSystemTrayIcon,
     QTextEdit,
     QVBoxLayout,
     QWidget,
-    QShortcut,
     QMessageBox,
 )
 
@@ -43,7 +40,7 @@ class MainWindow(QMainWindow):
         # State
         self.session_id = None
         self.persona_id = None
-        self.overlay_visible = True
+        # Stealth mode removed
 
         # UI
         self.transcript_view = QTextEdit()
@@ -56,7 +53,6 @@ class MainWindow(QMainWindow):
         self.btn_stop = QPushButton("Stop Transcript")
         self.btn_submit = QPushButton("Submit → Generate Answer")
         self.btn_copy = QPushButton("Copy Answer")
-        self.btn_stealth = QPushButton("Toggle Stealth (Ctrl+`)")
 
         self.btn_stop.setEnabled(False)
         self.btn_copy.setEnabled(False)
@@ -73,7 +69,6 @@ class MainWindow(QMainWindow):
         row.addWidget(self.btn_stop)
         row.addWidget(self.btn_submit)
         row.addWidget(self.btn_copy)
-        row.addWidget(self.btn_stealth)
         top.addLayout(row)
         top.addWidget(self.status_label)
 
@@ -81,27 +76,13 @@ class MainWindow(QMainWindow):
         container.setLayout(top)
         self.setCentralWidget(container)
 
-        # Tray / Stealth
-        self.tray = QSystemTrayIcon(QIcon())
-        self.tray.setToolTip("AI Interview Assistant")
-        menu = QMenu()
-        act_show = QAction("Show/Hide")
-        act_quit = QAction("Quit")
-        act_show.triggered.connect(self.toggle_stealth)
-        act_quit.triggered.connect(QApplication.instance().quit)
-        menu.addAction(act_show)
-        menu.addAction(act_quit)
-        self.tray.setContextMenu(menu)
-        self.tray.show()
-
-        QShortcut(QKeySequence("Ctrl+`"), self, activated=self.toggle_stealth)
+        # Tray removed
 
         # Events
         self.btn_start.clicked.connect(self.start_transcript)
         self.btn_stop.clicked.connect(self.stop_transcript)
         self.btn_submit.clicked.connect(self.submit_for_answer)
         self.btn_copy.clicked.connect(self.copy_answer)
-        self.btn_stealth.clicked.connect(self.toggle_stealth)
 
         # Backend client
         base_url = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000")
@@ -110,9 +91,7 @@ class MainWindow(QMainWindow):
         # Transcriber thread (lazy)
         self.transcriber = None
 
-    def toggle_stealth(self):
-        self.overlay_visible = not self.overlay_visible
-        self.setVisible(self.overlay_visible)
+    # Stealth toggle removed
 
     def start_transcript(self):
         if TranscriberThread is None:
@@ -167,6 +146,16 @@ class MainWindow(QMainWindow):
     def copy_answer(self):
         text = self.answer_view.toPlainText()
         QApplication.clipboard().setText(text)
+
+    def closeEvent(self, event):
+        """Ensure background threads are stopped cleanly on window close."""
+        try:
+            if self.transcriber and self.transcriber.isRunning():
+                self.transcriber.stop()
+                self.transcriber.wait(2000)
+        except Exception:
+            pass
+        event.accept()
 
 
 def main():
