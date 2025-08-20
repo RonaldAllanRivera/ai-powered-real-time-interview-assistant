@@ -23,14 +23,13 @@ class OpenAIService
         return !empty($this->apiKey);
     }
 
-    public function generateAnswer(string $prompt, ?int $personaId = null): string
+    public function generateAnswer(string $prompt, ?int $personaId = null, ?string $systemOverride = null): string
     {
         if (!$this->available()) {
             return '[OpenAI key missing]';
         }
 
-        $system = 'You are a concise, expert assistant. Answer in the user\'s saved style/persona if provided. Prefer short, high-signal responses.';
-        // TODO: Fetch persona/style by $personaId and augment $system with tone/few-shot examples.
+        $system = $systemOverride ?: 'You are a concise, expert assistant. Answer in the user\'s saved style/persona if provided. Prefer short, high-signal responses.';
 
         // Prefer library if installed
         if ($this->client) {
@@ -87,3 +86,4 @@ class OpenAIService
         return '[OpenAI error]';
     }
 }
+

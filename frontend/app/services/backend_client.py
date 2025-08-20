@@ -40,3 +40,40 @@ class BackendClient:
             return data.get("answer", "") or ""
         except Exception:
             return ""
+
+    # Personas
+    def get_personas(self):
+        try:
+            r = requests.get(f"{self.base_url}/api/personas", timeout=10)
+            r.raise_for_status()
+            return r.json().get("personas", [])
+        except Exception:
+            return []
+
+    # Interview info
+    def get_interview_info(self):
+        sid = self.ensure_session()
+        try:
+            r = requests.get(f"{self.base_url}/api/interview-info", params={"session_id": sid}, timeout=10)
+            r.raise_for_status()
+            return r.json().get("interview_info")
+        except Exception:
+            return None
+
+    def upsert_interview_info(self, company: Optional[str], role: Optional[str], context: Optional[str]):
+        sid = self.ensure_session()
+        try:
+            r = requests.post(
+                f"{self.base_url}/api/interview-info",
+                json={
+                    "session_id": sid,
+                    "company": company or None,
+                    "role": role or None,
+                    "context": context or None,
+                },
+                timeout=15,
+            )
+            r.raise_for_status()
+            return True
+        except Exception:
+            return False

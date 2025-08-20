@@ -15,6 +15,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox,
+    QComboBox,
+    QLineEdit,
+    QFormLayout,
 )
 
 # Lazy import of services to avoid hard dependency at start
@@ -53,11 +56,28 @@ class MainWindow(QMainWindow):
         self.btn_stop = QPushButton("Stop Transcript")
         self.btn_submit = QPushButton("Submit → Generate Answer")
         self.btn_copy = QPushButton("Copy Answer")
+        self.btn_save_info = QPushButton("Save Info")
+
+        # Interview metadata inputs
+        self.persona_combo = QComboBox()
+        self.input_company = QLineEdit()
+        self.input_role = QLineEdit()
+        self.input_context = QTextEdit()
+        self.input_company.setPlaceholderText("e.g., ACME Corp")
+        self.input_role.setPlaceholderText("e.g., Senior Backend Engineer")
+        self.input_context.setPlaceholderText("Paste job description or notes…")
 
         self.btn_stop.setEnabled(False)
         self.btn_copy.setEnabled(False)
 
         top = QVBoxLayout()
+        form = QFormLayout()
+        form.addRow("Persona", self.persona_combo)
+        form.addRow("Company", self.input_company)
+        form.addRow("Role", self.input_role)
+        form.addRow("Interview Notes", self.input_context)
+        top.addLayout(form)
+        top.addWidget(self.btn_save_info)
         top.addWidget(QLabel("Live Transcript"))
         top.addWidget(self.transcript_view, 2)
 
@@ -83,6 +103,8 @@ class MainWindow(QMainWindow):
         self.btn_stop.clicked.connect(self.stop_transcript)
         self.btn_submit.clicked.connect(self.submit_for_answer)
         self.btn_copy.clicked.connect(self.copy_answer)
+        self.btn_save_info.clicked.connect(self.save_interview_info)
+        self.persona_combo.currentIndexChanged.connect(self.on_persona_changed)
 
         # Backend client
         base_url = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000")
@@ -90,6 +112,9 @@ class MainWindow(QMainWindow):
 
         # Transcriber thread (lazy)
         self.transcriber = None
+
+        # Load personas and interview info
+        self.load_initial_data()
 
     # Stealth toggle removed
 
@@ -147,6 +172,47 @@ class MainWindow(QMainWindow):
         text = self.answer_view.toPlainText()
         QApplication.clipboard().setText(text)
 
+    def on_persona_changed(self, idx: int):
+        try:
+            self.persona_id = self.persona_combo.currentData()
+        except Exception:
+            self.persona_id = None
+
+    def save_interview_info(self):
+        company = self.input_company.text().strip()
+        role = self.input_role.text().strip()
+        context = self.input_context.toPlainText().strip()
+        ok = False
+        if self.backend:
+            try:
+                ok = self.backend.upsert_interview_info(company or None, role or None, context or None)
+            except Exception:
+                ok = False
+        self.status_label.setText("Info saved" if ok else "Save failed")
+
+    def load_initial_data(self):
+        if not self.backend:
+            return
+        # Personas
+        try:
+            personas = self.backend.get_personas() or []
+            self.persona_combo.clear()
+            for p in personas:
+                self.persona_combo.addItem(p.get("name", ""), p.get("id"))
+            if personas:
+                self.persona_combo.setCurrentIndex(0)
+                self.persona_id = self.persona_combo.currentData()
+        except Exception:
+            pass
+        # Interview info
+        try:
+            info = self.backend.get_interview_info()
+            if info:
+                self.input_company.setText(info.get("company", "") or "")
+                self.input_role.setText(info.get("role", "") or "")
+                self.input_context.setPlainText(info.get("context", "") or "")
+        except Exception:
+            pass
     def closeEvent(self, event):
         """Ensure background threads are stopped cleanly on window close."""
         try:

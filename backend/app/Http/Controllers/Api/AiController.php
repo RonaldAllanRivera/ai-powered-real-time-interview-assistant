@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Services\OpenAIService;
+use App\Models\Persona;
+use App\Models\TranscriptChunk;
+use App\Models\QAEntry;
+use App\Models\InterviewInfo;
 
 class AiController extends Controller
 {
@@ -19,11 +23,44 @@ class AiController extends Controller
         $validated = $request->validate([
             'prompt' => ['required', 'string', 'max:20000'],
             'persona_id' => ['nullable', 'integer'],
+            'session_id' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $answer = $openai->generateAnswer($validated['prompt'], $validated['persona_id'] ?? null);
+        $baseSystem = "You are a concise, expert assistant. Prefer short, high-signal responses.";
+        $system = $baseSystem;
 
-        // TODO: persist QA entry with session/persona association
+        // Persona enrichment
+        $personaId = $validated['persona_id'] ?? null;
+        $persona = null;
+        if ($personaId) {
+            $persona = Persona::find($personaId);
+            if ($persona) {
+                $system .= "\n\nPersona instructions:\n" . $persona->system_prompt;
+            }
+        }
+
+        // Interview info enrichment
+        $sid = $validated['session_id'] ?? null;
+        if ($sid) {
+            $info = InterviewInfo::where('session_id', $sid)->first();
+            if ($info) {
+                $system .= "\n\nInterview context:";
+                if ($info->company) { $system .= "\nCompany: {$info->company}"; }
+                if ($info->role) { $system .= "\nRole: {$info->role}"; }
+                if ($info->context) { $system .= "\nNotes:\n{$info->context}"; }
+            }
+        }
+
+        $answer = $openai->generateAnswer($validated['prompt'], null, $system);
+
+        // Persist QA entry
+        QAEntry::create([
+            'session_id' => $sid ?? 'local-dev',
+            'persona_id' => $persona?->id,
+            'question' => $validated['prompt'],
+            'ai_answer' => $answer,
+        ]);
+
         return response()->json([
             'answer' => $answer,
         ]);
@@ -37,9 +74,47 @@ class AiController extends Controller
             'source' => ['nullable', 'string', 'max:50'],
         ]);
 
-        // TODO: persist transcript chunk. For now, just acknowledge.
-        return response()->json([
-            'ok' => true,
+        TranscriptChunk::create([
+            'session_id' => $validated['session_id'] ?? 'local-dev',
+            'text' => $validated['text'],
+            'source' => $validated['source'] ?? null,
         ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function personas(): JsonResponse
+    {
+        $rows = Persona::query()->select(['id', 'name'])->orderBy('id')->get();
+        return response()->json(['personas' => $rows]);
+    }
+
+    public function upsertInterviewInfo(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'session_id' => ['required', 'string', 'max:100'],
+            'company' => ['nullable', 'string', 'max:150'],
+            'role' => ['nullable', 'string', 'max:150'],
+            'context' => ['nullable', 'string'],
+        ]);
+
+        $info = InterviewInfo::updateOrCreate(
+            ['session_id' => $validated['session_id']],
+            [
+                'company' => $validated['company'] ?? null,
+                'role' => $validated['role'] ?? null,
+                'context' => $validated['context'] ?? null,
+            ]
+        );
+
+        return response()->json(['ok' => true, 'interview_info' => $info]);
+    }
+
+    public function getInterviewInfo(Request $request): JsonResponse
+    {
+        $sid = (string) $request->query('session_id', 'local-dev');
+        $info = InterviewInfo::where('session_id', $sid)->first();
+        return response()->json(['interview_info' => $info]);
     }
 }
+
