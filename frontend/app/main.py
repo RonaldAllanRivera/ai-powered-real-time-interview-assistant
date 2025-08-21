@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QLineEdit,
     QFormLayout,
+    QToolButton,
+    QStyle,
 )
 
 # Lazy import of services to avoid hard dependency at start
@@ -43,6 +45,7 @@ class MainWindow(QMainWindow):
         # State
         self.session_id = None
         self.persona_id = None
+        self.personas = []
         # Stealth mode removed
 
         # UI
@@ -72,7 +75,21 @@ class MainWindow(QMainWindow):
 
         top = QVBoxLayout()
         form = QFormLayout()
-        form.addRow("Persona", self.persona_combo)
+        # Help icon for personas
+        self.persona_help = QToolButton()
+        self.persona_help.setIcon(self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.persona_help.setToolTip("What do these personas do?")
+        self.persona_help.setAutoRaise(True)
+
+        persona_label_widget = QWidget()
+        persona_label_layout = QHBoxLayout()
+        persona_label_layout.setContentsMargins(0, 0, 0, 0)
+        persona_label_layout.addWidget(QLabel("Persona"))
+        persona_label_layout.addWidget(self.persona_help)
+        persona_label_layout.addStretch()
+        persona_label_widget.setLayout(persona_label_layout)
+
+        form.addRow(persona_label_widget, self.persona_combo)
         form.addRow("Company", self.input_company)
         form.addRow("Role", self.input_role)
         form.addRow("Interview Notes", self.input_context)
@@ -105,6 +122,7 @@ class MainWindow(QMainWindow):
         self.btn_copy.clicked.connect(self.copy_answer)
         self.btn_save_info.clicked.connect(self.save_interview_info)
         self.persona_combo.currentIndexChanged.connect(self.on_persona_changed)
+        self.persona_help.clicked.connect(self.show_persona_help)
 
         # Backend client
         base_url = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000")
@@ -174,7 +192,11 @@ class MainWindow(QMainWindow):
 
     def on_persona_changed(self, idx: int):
         try:
-            self.persona_id = self.persona_combo.currentData()
+            data = self.persona_combo.currentData()
+            if isinstance(data, dict):
+                self.persona_id = data.get("id")
+            else:
+                self.persona_id = data
         except Exception:
             self.persona_id = None
 
@@ -196,12 +218,18 @@ class MainWindow(QMainWindow):
         # Personas
         try:
             personas = self.backend.get_personas() or []
+            self.personas = personas
             self.persona_combo.clear()
             for p in personas:
-                self.persona_combo.addItem(p.get("name", ""), p.get("id"))
+                self.persona_combo.addItem(p.get("name", ""), p)
+                idx = self.persona_combo.count() - 1
+                tooltip = (p.get("description") or "").strip()
+                if tooltip:
+                    self.persona_combo.setItemData(idx, tooltip, Qt.ToolTipRole)
             if personas:
                 self.persona_combo.setCurrentIndex(0)
-                self.persona_id = self.persona_combo.currentData()
+                data = self.persona_combo.currentData()
+                self.persona_id = data.get("id") if isinstance(data, dict) else data
         except Exception:
             pass
         # Interview info
@@ -222,6 +250,32 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         event.accept()
+
+    def show_persona_help(self):
+        """Show details about the currently selected persona, including description and the AI prompt used."""
+        try:
+            data = self.persona_combo.currentData()
+            if isinstance(data, dict):
+                name = data.get("name", "Persona")
+                desc = (data.get("description") or "").strip()
+                prompt = (data.get("system_prompt") or "").strip()
+            else:
+                name = self.persona_combo.currentText()
+                desc = "Select a persona to view details."
+                prompt = ""
+
+            parts = []
+            parts.append(f"<b>{name}</b>")
+            if desc:
+                parts.append(desc.replace("\n", "<br>"))
+            if prompt:
+                parts.append("<b>Prompt used by AI:</b>")
+                # Use <pre> for readability; kept simple to avoid heavy formatting
+                parts.append(f"<pre style='white-space:pre-wrap'>{prompt}</pre>")
+            html = "<br><br>".join(parts)
+            QMessageBox.information(self, "Persona help", html)
+        except Exception:
+            QMessageBox.information(self, "Persona help", "Select a persona to view details.")
 
 
 def main():

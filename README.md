@@ -18,7 +18,7 @@ Tech stack:
 - `frontend/` Python desktop app: captures system audio, transcribes in near real-time, displays an always-on-top window (no tray icon/stealth overlay), calls backend APIs, stores corrections.
 
 Data model (current):
-- `personas`: name, system_prompt
+- `personas`: name, description, system_prompt
 - `transcript_chunks`: session_id (indexed), text, source, timestamps
 - `qa_entries`: session_id (indexed), persona_id (indexed, nullable), question, ai_answer, final_answer, timestamps
 - `interview_infos`: session_id (unique), company, role, context, timestamps
@@ -76,12 +76,24 @@ frontend\.venv\Scripts\python -m frontend.app.main
 - The window stays on top; no tray icon or stealth overlay.
 - In simulation mode, lines keep coming until you press Stop or close the app (stop is instant).
 
+## Personas
+- Direct & Technical (Truthful): Focused, honest, and technical. States what you have and haven’t done; mentions close alternatives you’ve actually used.
+- Structured & Example-Driven: Organizes into clear points and cites specific projects/outcomes.
+- Polished & Professional: Confident, client-facing tone; closes with alignment to role/company values.
+
+The persona help icon next to the selector shows each persona’s description and the exact AI prompt used.
+
 ## Notes on audio capture
 - The frontend will attempt WASAPI loopback on Windows to capture system audio. If not available or packages missing, it falls back to a simulation so the UI still works. Install the dependencies to enable real capture.
   - The simulator now stops immediately when you press Stop.
 
 ## Security
 - The backend reads `OPENAI_API_KEY` from `backend/.env`. Keep it server-side. The frontend does not require an OpenAI key.
+
+## AI model
+- Default: `gpt-4o-mini` (fast and cost-efficient).
+- Change it in `backend/app/Services/OpenAIService.php` in `generateAnswer()` (both the SDK and HTTP paths).
+- Optional future improvement: make it configurable via `OPENAI_MODEL` env.
 
 ## Roadmap (next steps)
 - Implement real-time transcription via Whisper or faster-whisper with VAD.

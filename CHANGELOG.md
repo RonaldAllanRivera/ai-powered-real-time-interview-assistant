@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-08-21
+- Backend:
+  - Added `description` column to `personas` via migration `2025_08_21_000005_add_description_to_personas_table`.
+  - Updated `PersonaSeeder` with 3 default personas (Direct & Technical, Structured & Example-Driven, Polished & Professional) including `description` and `system_prompt`.
+  - Personas API now returns `id`, `name`, `description`, `system_prompt` from `AiController::personas()`.
+  - Default OpenAI model set to `gpt-4o-mini` in `OpenAIService::generateAnswer()` (SDK + HTTP fallback paths).
+- Frontend:
+  - Added help icon next to the persona dropdown; shows description and exact prompt in a dialog; items have tooltips.
+- Docs:
+  - Updated `README.md` with Personas section, data model (`description`), AI model notes, and clarified run command (`python -m frontend.app.main`).
+
 ## [0.2.0] - 2025-08-20
 - Backend:
   - Added migrations and models for `personas`, `transcript_chunks`, `qa_entries`, and `interview_infos`.

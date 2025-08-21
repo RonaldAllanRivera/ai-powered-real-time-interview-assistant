@@ -85,7 +85,7 @@ class AiController extends Controller
 
     public function personas(): JsonResponse
     {
-        $rows = Persona::query()->select(['id', 'name'])->orderBy('id')->get();
+        $rows = Persona::query()->select(['id', 'name', 'description', 'system_prompt'])->orderBy('id')->get();
         return response()->json(['personas' => $rows]);
     }
 

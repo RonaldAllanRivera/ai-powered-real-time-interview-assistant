@@ -10,6 +10,6 @@ class Persona extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'system_prompt',
+        'name', 'description', 'system_prompt',
     ];
 }
