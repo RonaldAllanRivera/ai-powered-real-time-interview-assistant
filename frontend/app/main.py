@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
+import hashlib
 
 from PySide6.QtCore import Qt, QThread, Signal
  # (Tray icon removed)
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QToolButton,
     QStyle,
+    QCheckBox,
 )
 
 # Lazy import of services to avoid hard dependency at start
@@ -48,6 +50,7 @@ class MainWindow(QMainWindow):
         self.personas = []
         self.model_id = None
         self.models = []
+        self.last_prompt_hash = None
         # Stealth mode removed
 
         # UI
@@ -62,6 +65,9 @@ class MainWindow(QMainWindow):
         self.btn_submit = QPushButton("Submit → Generate Answer")
         self.btn_copy = QPushButton("Copy Answer")
         self.btn_save_info = QPushButton("Save Info")
+        self.btn_reset = QPushButton("Reset Transcript")
+        self.chk_clear_after = QCheckBox("Clear after answer")
+        self.chk_clear_after.setChecked(True)
 
         # Interview metadata inputs
         self.persona_combo = QComboBox()
@@ -137,7 +143,9 @@ class MainWindow(QMainWindow):
         row.addWidget(self.btn_stop)
         row.addWidget(self.btn_submit)
         row.addWidget(self.btn_copy)
+        row.addWidget(self.btn_reset)
         top.addLayout(row)
+        top.addWidget(self.chk_clear_after)
         top.addWidget(self.status_label)
 
         container = QWidget()
@@ -152,6 +160,7 @@ class MainWindow(QMainWindow):
         self.btn_submit.clicked.connect(self.submit_for_answer)
         self.btn_copy.clicked.connect(self.copy_answer)
         self.btn_save_info.clicked.connect(self.save_interview_info)
+        self.btn_reset.clicked.connect(self.reset_transcript)
         self.persona_combo.currentIndexChanged.connect(self.on_persona_changed)
         self.persona_help.clicked.connect(self.show_persona_help)
         self.model_combo.currentIndexChanged.connect(self.on_model_changed)
@@ -197,6 +206,8 @@ class MainWindow(QMainWindow):
         if not text:
             return
         self.transcript_view.append(text)
+        # Any new text invalidates the last submitted hash
+        self.last_prompt_hash = None
         # Optionally post to backend for persistence
         if self.backend:
             try:
@@ -209,6 +220,14 @@ class MainWindow(QMainWindow):
         if not question:
             QMessageBox.information(self, "No transcript", "Nothing to submit yet.")
             return
+        # Dedupe: avoid answering the exact same transcript content again
+        try:
+            h = hashlib.sha256(question.encode("utf-8")).hexdigest()
+        except Exception:
+            h = None
+        if self.last_prompt_hash and h and h == self.last_prompt_hash:
+            QMessageBox.information(self, "Already answered", "This transcript was already answered. Add new content or Reset.")
+            return
         self.status_label.setText("Generating answer...")
         answer = None
         if self.backend:
@@ -220,11 +239,25 @@ class MainWindow(QMainWindow):
             answer = "[Backend not running yet] This is a placeholder answer."
         self.answer_view.setPlainText(answer)
         self.btn_copy.setEnabled(True)
+        # Remember the last answered prompt hash
+        self.last_prompt_hash = h
+        # Auto-clear transcript if enabled
+        if self.chk_clear_after.isChecked():
+            self.reset_transcript()
         self.status_label.setText("Ready")
 
     def copy_answer(self):
         text = self.answer_view.toPlainText()
         QApplication.clipboard().setText(text)
+
+    def reset_transcript(self):
+        """Clear the live transcript UI only and reset dedupe state."""
+        try:
+            self.transcript_view.clear()
+            self.last_prompt_hash = None
+            self.status_label.setText("Transcript cleared")
+        except Exception:
+            pass
 
     def update_context_counter(self):
         """Update the Interview Notes character counter and warn when exceeding soft limit."""

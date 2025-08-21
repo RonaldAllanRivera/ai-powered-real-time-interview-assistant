@@ -40,6 +40,23 @@ class AiController extends Controller
             }
         }
 
+        // Determine session id early for caching and persistence
+        $cacheSid = (string) ($validated['session_id'] ?? 'local-dev');
+        // Exact-match cache: if same session, persona, and identical question already answered, return it
+        $query = QAEntry::where('session_id', $cacheSid)
+            ->where('question', $validated['prompt']);
+        if ($persona?->id) {
+            $query->where('persona_id', $persona->id);
+        } else {
+            $query->whereNull('persona_id');
+        }
+        $existing = $query->orderByDesc('id')->first();
+        if ($existing) {
+            return response()->json([
+                'answer' => (string) $existing->ai_answer,
+            ]);
+        }
+
         // Interview info enrichment
         $sid = $validated['session_id'] ?? null;
         if ($sid) {
@@ -68,7 +85,7 @@ class AiController extends Controller
 
         // Persist QA entry
         QAEntry::create([
-            'session_id' => $sid ?? 'local-dev',
+            'session_id' => $cacheSid,
             'persona_id' => $persona?->id,
             'question' => $validated['prompt'],
             'ai_answer' => $answer,
