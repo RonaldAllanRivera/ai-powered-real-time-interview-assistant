@@ -72,6 +72,11 @@ class MainWindow(QMainWindow):
         # Interview metadata inputs
         self.persona_combo = QComboBox()
         self.model_combo = QComboBox()
+        # Audio device selection
+        self.device_combo = QComboBox()
+        self.btn_refresh_devices = QToolButton()
+        self.btn_refresh_devices.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
+        self.btn_refresh_devices.setToolTip("Refresh audio devices (WASAPI loopback)")
         self.input_company = QLineEdit()
         self.input_role = QLineEdit()
         self.input_context = QTextEdit()
@@ -126,6 +131,14 @@ class MainWindow(QMainWindow):
         model_label_widget.setLayout(model_label_layout)
 
         form.addRow(model_label_widget, self.model_combo)
+        # Device row with refresh tool button
+        device_row_widget = QWidget()
+        device_row_layout = QHBoxLayout()
+        device_row_layout.setContentsMargins(0, 0, 0, 0)
+        device_row_layout.addWidget(self.device_combo)
+        device_row_layout.addWidget(self.btn_refresh_devices)
+        device_row_widget.setLayout(device_row_layout)
+        form.addRow("Capture Device", device_row_widget)
         form.addRow("Company", self.input_company)
         form.addRow("Role", self.input_role)
         form.addRow("Interview Notes", self.input_context)
@@ -165,6 +178,7 @@ class MainWindow(QMainWindow):
         self.persona_help.clicked.connect(self.show_persona_help)
         self.model_combo.currentIndexChanged.connect(self.on_model_changed)
         self.model_help.clicked.connect(self.show_model_help)
+        self.btn_refresh_devices.clicked.connect(self.refresh_devices)
 
         # Backend client
         base_url = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000")
@@ -178,6 +192,8 @@ class MainWindow(QMainWindow):
         self.load_initial_data()
         # initialize counter after initial data load
         self.update_context_counter()
+        # populate audio devices
+        self.refresh_devices()
 
     # Stealth toggle removed
 
@@ -187,7 +203,12 @@ class MainWindow(QMainWindow):
             return
         if self.transcriber and self.transcriber.isRunning():
             return
-        self.transcriber = TranscriberThread()
+        device_name = None
+        try:
+            device_name = (self.device_combo.currentText() or "").strip() or None
+        except Exception:
+            device_name = None
+        self.transcriber = TranscriberThread(device_name=device_name)
         self.transcriber.transcriptReady.connect(self.on_transcript)
         self.transcriber.started.connect(lambda: self.status_label.setText("Transcribing..."))
         self.transcriber.finished.connect(lambda: self.status_label.setText("Stopped"))
@@ -338,6 +359,29 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
         event.accept()
+
+    def refresh_devices(self):
+        """Enumerate WASAPI loopback devices and populate the combo box.
+        Falls back gracefully if dependencies are missing.
+        """
+        try:
+            # Import here to avoid hard dependency at startup
+            import soundcard as sc  # type: ignore
+        except Exception:
+            # No deps -> keep simulation-only label
+            self.device_combo.clear()
+            self.device_combo.addItem("Simulated (no audio deps)")
+            return
+        try:
+            mics = sc.all_microphones(include_loopback=True)
+            self.device_combo.clear()
+            for m in mics:
+                self.device_combo.addItem(m.name)
+            if not mics:
+                self.device_combo.addItem("No loopback devices found")
+        except Exception:
+            self.device_combo.clear()
+            self.device_combo.addItem("Device enumeration error")
 
     def show_persona_help(self):
         """Show details about the currently selected persona, including description and the AI prompt used."""

@@ -65,6 +65,10 @@ if (Get-Command py -ErrorAction SilentlyContinue) { py -3 -m venv frontend\.venv
 frontend\.venv\Scripts\python -m pip install -U pip
 frontend\.venv\Scripts\pip install -r frontend\requirements.txt
 
+# Optional local STT and VAD (recommended)
+# Use prebuilt wheels to avoid MSVC toolchain on Windows
+frontend\.venv\Scripts\pip install faster-whisper webrtcvad-wheels
+
 # Run the app
 frontend\.venv\Scripts\python -m frontend.app.main
 ```
@@ -76,6 +80,12 @@ frontend\.venv\Scripts\python -m frontend.app.main
 - The window stays on top; no tray icon or stealth overlay.
 - In simulation mode, lines keep coming until you press Stop or close the app (stop is instant).
 
+### Live transcript controls
+- **Start/Stop Transcript**: begins/stops capturing system audio.
+- **Capture Device**: pick the WASAPI loopback device (e.g., your speakers or meeting app). Use the reload icon to refresh.
+- **Reset Transcript**: clears only the visible transcript (DB history remains). This also resets the prompt dedupe.
+- **Clear after answer**: if checked (default), the transcript view auto-clears after an AI answer is returned.
+
 ## Personas
 - Direct & Technical (Truthful): Focused, honest, and technical. States what you have and haven’t done; mentions close alternatives you’ve actually used.
 - Structured & Example-Driven: Organizes into clear points and cites specific projects/outcomes.
@@ -83,9 +93,42 @@ frontend\.venv\Scripts\python -m frontend.app.main
 
 The persona help icon next to the selector shows each persona’s description and the exact AI prompt used.
 
-## Notes on audio capture
-- The frontend will attempt WASAPI loopback on Windows to capture system audio. If not available or packages missing, it falls back to a simulation so the UI still works. Install the dependencies to enable real capture.
-  - The simulator now stops immediately when you press Stop.
+## Audio capture and transcription
+- The frontend uses **WASAPI loopback** via `soundcard` to capture system audio (Zoom/Meet/YouTube/etc.).
+- Optional **VAD** using `webrtcvad` (aggressiveness 0–3; default 2). If `webrtcvad` isn't installed, an energy-based fallback is used.
+- Optional on-device **STT** using `faster-whisper`. If not installed, segments are emitted with timestamps as placeholders.
+
+- Probes multiple input sample rates (device default, 48000, 44100, 32000, 16000) and resamples to 16 kHz for VAD/STT.
+- On start, the transcript shows a status line like: `[Audio] Capturing from 'Speakers (Realtek…)'
+  (loopback=True) @ 48000 Hz | VAD: WebRTC(2) | STT: faster-whisper`.
+- Includes a built-in compatibility shim for NumPy 2.x to transparently redirect deprecated binary `np.fromstring` calls to `np.frombuffer` inside dependencies.
+- First run of STT may download the Whisper model specified by `WHISPER_MODEL` (e.g., `tiny.en`).
+
+### Dependencies
+- Required: `soundcard`, `numpy` (already listed in `frontend/requirements.txt`).
+- Optional: `webrtcvad` (may require MSVC on Windows), `faster-whisper`.
+  - To enable local STT, install `faster-whisper` and set `WHISPER_MODEL` (e.g., `tiny.en`).
+
+### Device selection
+- Use the "Capture Device" dropdown to choose a loopback device. If none appear, click refresh.
+- If no devices are found, the app shows a status message. The simulator is used only when audio dependencies are missing.
+
+__System audio vs app-specific audio__
+- Loopback captures everything routed to the chosen output device. To capture "all system audio", set that device as Windows default output or route apps in Settings → System → Sound → App volume and device preferences.
+- To mix multiple outputs, use a virtual mixer (e.g., VB-Audio VoiceMeeter) and select its loopback.
+
+__List available devices (PowerShell)__
+```powershell
+frontend\.venv\Scripts\python -c "import soundcard as sc, sys; m=sc.all_microphones(include_loopback=True); [sys.stdout.write('[{}] {} | loopback={} | default_sr={}\n'.format(i,d.name,getattr(d,'isloopback',None),getattr(d,'default_samplerate',None))) for i,d in enumerate(m)]"
+```
+
+If your preferred loopback isn’t defaulted, select it manually in the dropdown and press Start again.
+
+### Troubleshooting
+- __NumPy 2.x ‘fromstring’ error__: We ship a shim that redirects binary `np.fromstring` calls to `np.frombuffer` inside dependencies (e.g., `soundcard`). If you still see it, restart the app. As a fallback, `pip install -U soundcard`. Avoid downgrading NumPy to 1.x on Windows unless wheels exist; building from source requires MSVC.
+- __VAD install fails__: Use `webrtcvad-wheels` (prebuilt) instead of `webrtcvad` source builds on Windows.
+- __No transcript__: Ensure Zoom/Meet/YouTube are routed to the selected loopback device (Windows Sound settings). Try another loopback (e.g., Speakers vs Digital Output).
+- __STT disabled__: Without `faster-whisper`, you’ll see placeholder segments like `[Audio segment ~Ns]`. Install `faster-whisper` and set `WHISPER_MODEL` (e.g., `tiny.en`) in `frontend/.env`.
 
 ## Security
 - The backend reads `OPENAI_API_KEY` from `backend/.env`. Keep it server-side. The frontend does not require an OpenAI key.
@@ -103,7 +146,6 @@ The persona help icon next to the selector shows each persona’s description an
  - Keep interview notes focused. Extremely long notes can increase latency and reduce answer quality.
 
 ## Roadmap (next steps)
-- Implement real-time transcription via Whisper or faster-whisper with VAD.
 - Personas CRUD; corrections capture and learning loop to adapt prompts.
 - Streamed responses; retry/backoff and better error UX.
 - Automated tests for API and UI.

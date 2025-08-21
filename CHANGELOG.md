@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.3] - 2025-08-21
+- Frontend:
+  - Implement real Windows WASAPI loopback capture with device selection and loopback preference in `frontend/app/main.py` and `frontend/app/services/transcriber.py`.
+  - Probe multiple sample rates (device default, 48000, 44100, 32000, 16000), resample to 16 kHz (optimized 48k→16k path), and mix to mono.
+  - Add optional VAD via `webrtcvad` (default aggressiveness 2) with energy-based fallback when unavailable.
+  - Add optional on-device STT via `faster-whisper` controlled by `WHISPER_MODEL` (e.g., `tiny.en`). Status line shows device, loopback flag, sample rate, VAD/STT.
+  - Improve error handling and detailed status lines; emit placeholder segments when STT is not installed.
+  - Fix NumPy 2.x `fromstring` binary-mode error by shimming to `np.frombuffer`, including CFFI buffer handling, preventing crashes from `soundcard` on Windows.
+- Docs:
+  - Update `README.md` with device listing command, troubleshooting for NumPy 2.x, Windows audio routing guidance, and optional installs using prebuilt `webrtcvad-wheels`.
+
 ## [0.3.2] - 2025-08-21
 - Backend:
   - Add soft cap for interview notes via `INTERVIEW_NOTES_SOFT_LIMIT` (default 10,000). Server truncates to head + tail with a marker when exceeded before calling OpenAI.
