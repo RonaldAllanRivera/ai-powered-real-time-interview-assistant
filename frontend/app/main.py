@@ -46,6 +46,8 @@ class MainWindow(QMainWindow):
         self.session_id = None
         self.persona_id = None
         self.personas = []
+        self.model_id = None
+        self.models = []
         # Stealth mode removed
 
         # UI
@@ -63,6 +65,7 @@ class MainWindow(QMainWindow):
 
         # Interview metadata inputs
         self.persona_combo = QComboBox()
+        self.model_combo = QComboBox()
         self.input_company = QLineEdit()
         self.input_role = QLineEdit()
         self.input_context = QTextEdit()
@@ -90,6 +93,22 @@ class MainWindow(QMainWindow):
         persona_label_widget.setLayout(persona_label_layout)
 
         form.addRow(persona_label_widget, self.persona_combo)
+
+        # Help icon for model selection
+        self.model_help = QToolButton()
+        self.model_help.setIcon(self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.model_help.setToolTip("Which model should I use?")
+        self.model_help.setAutoRaise(True)
+
+        model_label_widget = QWidget()
+        model_label_layout = QHBoxLayout()
+        model_label_layout.setContentsMargins(0, 0, 0, 0)
+        model_label_layout.addWidget(QLabel("Model"))
+        model_label_layout.addWidget(self.model_help)
+        model_label_layout.addStretch()
+        model_label_widget.setLayout(model_label_layout)
+
+        form.addRow(model_label_widget, self.model_combo)
         form.addRow("Company", self.input_company)
         form.addRow("Role", self.input_role)
         form.addRow("Interview Notes", self.input_context)
@@ -123,6 +142,8 @@ class MainWindow(QMainWindow):
         self.btn_save_info.clicked.connect(self.save_interview_info)
         self.persona_combo.currentIndexChanged.connect(self.on_persona_changed)
         self.persona_help.clicked.connect(self.show_persona_help)
+        self.model_combo.currentIndexChanged.connect(self.on_model_changed)
+        self.model_help.clicked.connect(self.show_model_help)
 
         # Backend client
         base_url = os.getenv("BACKEND_BASE_URL", "http://127.0.0.1:8000")
@@ -131,7 +152,8 @@ class MainWindow(QMainWindow):
         # Transcriber thread (lazy)
         self.transcriber = None
 
-        # Load personas and interview info
+        # Load models, personas and interview info
+        self.load_models()
         self.load_initial_data()
 
     # Stealth toggle removed
@@ -177,7 +199,7 @@ class MainWindow(QMainWindow):
         answer = None
         if self.backend:
             try:
-                answer = self.backend.generate_answer(question, self.persona_id)
+                answer = self.backend.generate_answer(question, self.persona_id, self.model_id)
             except Exception as e:
                 answer = None
         if not answer:
@@ -276,6 +298,60 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Persona help", html)
         except Exception:
             QMessageBox.information(self, "Persona help", "Select a persona to view details.")
+
+    def load_models(self):
+        """Populate model selector with fast defaults and tooltips."""
+        try:
+            self.models = [
+                {
+                    "id": "gpt-4o-mini",
+                    "name": "gpt-4o-mini (fast)",
+                    "tooltip": "Fastest + low cost. Great for live interviews. Slightly less depth vs gpt-4o.",
+                    "pros": ["Lowest latency", "Lower cost"],
+                    "cons": ["Less nuanced than gpt-4o"],
+                },
+                {
+                    "id": "gpt-4o",
+                    "name": "gpt-4o (higher quality)",
+                    "tooltip": "Higher quality/reasoning. Slower and higher cost vs 4o-mini.",
+                    "pros": ["Best quality in 4o family"],
+                    "cons": ["Higher latency", "Higher cost"],
+                },
+            ]
+            self.model_combo.clear()
+            for m in self.models:
+                self.model_combo.addItem(m["name"], m)
+                idx = self.model_combo.count() - 1
+                self.model_combo.setItemData(idx, m.get("tooltip", ""), Qt.ToolTipRole)
+            if self.models:
+                # Default to speed-first
+                self.model_combo.setCurrentIndex(0)
+                cur = self.model_combo.currentData()
+                self.model_id = cur.get("id") if isinstance(cur, dict) else cur
+        except Exception:
+            self.model_id = "gpt-4o-mini"
+
+    def on_model_changed(self, idx: int):
+        try:
+            data = self.model_combo.currentData()
+            if isinstance(data, dict):
+                self.model_id = data.get("id")
+            else:
+                self.model_id = data
+        except Exception:
+            self.model_id = None
+
+    def show_model_help(self):
+        try:
+            parts = ["<b>Model options</b>"]
+            for m in self.models:
+                pros = "<br>".join([f"+ {p}" for p in m.get("pros", [])])
+                cons = "<br>".join([f"- {c}" for c in m.get("cons", [])])
+                parts.append(f"<b>{m['name']}</b><br>{m.get('tooltip','')}<br>{pros}<br>{cons}")
+            html = "<br><br>".join(parts)
+            QMessageBox.information(self, "Model help", html)
+        except Exception:
+            QMessageBox.information(self, "Model help", "Choose gpt-4o-mini for speed; gpt-4o for quality.")
 
 
 def main():

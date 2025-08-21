@@ -91,9 +91,15 @@ The persona help icon next to the selector shows each persona’s description an
 - The backend reads `OPENAI_API_KEY` from `backend/.env`. Keep it server-side. The frontend does not require an OpenAI key.
 
 ## AI model
-- Default: `gpt-4o-mini` (fast and cost-efficient).
-- Change it in `backend/app/Services/OpenAIService.php` in `generateAnswer()` (both the SDK and HTTP paths).
-- Optional future improvement: make it configurable via `OPENAI_MODEL` env.
+ - Default: `gpt-4o-mini` (fast and cost-efficient).
+ - UI: Use the Model dropdown to choose `gpt-4o-mini (fast)` or `gpt-4o (higher quality)`. Hover for tooltips; click the help icon for pros/cons.
+ - Backend: `POST /api/generate-answer` accepts an optional `model`; `OpenAIService` falls back to `OPENAI_MODEL` in `backend/.env` when the UI doesn’t specify.
+ - Config: set `OPENAI_MODEL` in `backend/.env` to change the default.
+
+## Interview notes limits
+- Stored as LONGTEXT in DB (`interview_infos.context`), so no hard limit in the app.
+- API allows any string; the effective cap is the model’s context window.
+- Extremely long notes can increase latency or exceed context and may be truncated/summarized in a future release.
 
 ## Roadmap (next steps)
 - Implement real-time transcription via Whisper or faster-whisper with VAD.

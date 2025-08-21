@@ -27,12 +27,12 @@ class BackendClient:
         except Exception:
             pass
 
-    def generate_answer(self, prompt: str, persona_id: Optional[int]) -> str:
+    def generate_answer(self, prompt: str, persona_id: Optional[int], model: Optional[str] = None) -> str:
         sid = self.ensure_session()
         try:
             r = requests.post(
                 f"{self.base_url}/api/generate-answer",
-                json={"session_id": sid, "persona_id": persona_id, "prompt": prompt},
+                json={"session_id": sid, "persona_id": persona_id, "prompt": prompt, "model": model},
                 timeout=60,
             )
             r.raise_for_status()

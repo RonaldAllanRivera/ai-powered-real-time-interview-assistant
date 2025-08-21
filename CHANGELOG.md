@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-08-21
+- Docs:
+  - README: document Model selector UI (tooltips + help), per-request model override, and default `OPENAI_MODEL` fallback.
+  - README: add Interview Notes limits section (LONGTEXT in DB; effective cap is model context window).
+
 ## [0.3.0] - 2025-08-21
 - Backend:
   - Added `description` column to `personas` via migration `2025_08_21_000005_add_description_to_personas_table`.

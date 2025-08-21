@@ -23,7 +23,7 @@ class OpenAIService
         return !empty($this->apiKey);
     }
 
-    public function generateAnswer(string $prompt, ?int $personaId = null, ?string $systemOverride = null): string
+    public function generateAnswer(string $prompt, ?int $personaId = null, ?string $systemOverride = null, ?string $modelOverride = null): string
     {
         if (!$this->available()) {
             return '[OpenAI key missing]';
@@ -31,11 +31,16 @@ class OpenAIService
 
         $system = $systemOverride ?: 'You are a concise, expert assistant. Answer in the user\'s saved style/persona if provided. Prefer short, high-signal responses.';
 
+        // Select model (UI override > env > default)
+        $modelToUse = (function() use ($modelOverride) {
+            return $modelOverride ?: (string) env('OPENAI_MODEL', 'gpt-4o-mini');
+        })();
+
         // Prefer library if installed
         if ($this->client) {
             try {
                 $response = $this->client->chat()->create([
-                    'model' => 'gpt-4o-mini',
+                    'model' => $modelToUse,
                     'temperature' => 0.4,
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
@@ -53,7 +58,7 @@ class OpenAIService
 
         // Fallback: direct HTTP call to OpenAI Chat Completions
         $payload = [
-            'model' => 'gpt-4o-mini',
+            'model' => $modelToUse,
             'temperature' => 0.4,
             'messages' => [
                 ['role' => 'system', 'content' => $system],

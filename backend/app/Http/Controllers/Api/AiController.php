@@ -24,6 +24,7 @@ class AiController extends Controller
             'prompt' => ['required', 'string', 'max:20000'],
             'persona_id' => ['nullable', 'integer'],
             'session_id' => ['nullable', 'string', 'max:100'],
+            'model' => ['nullable', 'string', 'max:50'],
         ]);
 
         $baseSystem = "You are a concise, expert assistant. Prefer short, high-signal responses.";
@@ -51,7 +52,8 @@ class AiController extends Controller
             }
         }
 
-        $answer = $openai->generateAnswer($validated['prompt'], null, $system);
+        $model = isset($validated['model']) ? (string) $validated['model'] : null;
+        $answer = $openai->generateAnswer($validated['prompt'], null, $system, $model);
 
         // Persist QA entry
         QAEntry::create([
