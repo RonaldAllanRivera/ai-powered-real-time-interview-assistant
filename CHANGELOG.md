@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-08-21
+- Backend:
+  - Add soft cap for interview notes via `INTERVIEW_NOTES_SOFT_LIMIT` (default 10,000). Server truncates to head + tail with a marker when exceeded before calling OpenAI.
+- Frontend:
+  - Add live Interview Notes character counter with soft limit warning; configurable via `INTERVIEW_NOTES_SOFT_LIMIT` in `frontend/.env`.
+- Docs:
+  - README updated with details on soft limit, backend truncation, and env configuration.
+
 ## [0.3.1] - 2025-08-21
 - Docs:
   - README: document Model selector UI (tooltips + help), per-request model override, and default `OPENAI_MODEL` fallback.

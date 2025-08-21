@@ -48,7 +48,18 @@ class AiController extends Controller
                 $system .= "\n\nInterview context:";
                 if ($info->company) { $system .= "\nCompany: {$info->company}"; }
                 if ($info->role) { $system .= "\nRole: {$info->role}"; }
-                if ($info->context) { $system .= "\nNotes:\n{$info->context}"; }
+                if ($info->context) {
+                    $limit = (int) env('INTERVIEW_NOTES_SOFT_LIMIT', 10000);
+                    $notes = (string) $info->context;
+                    if (strlen($notes) > $limit) {
+                        $headLen = (int) floor($limit * 0.7);
+                        $tailLen = (int) floor($limit * 0.25);
+                        $head = substr($notes, 0, $headLen);
+                        $tail = substr($notes, -$tailLen);
+                        $notes = $head . "\n[... truncated for speed/context ...]\n" . $tail;
+                    }
+                    $system .= "\nNotes:\n{$notes}";
+                }
             }
         }
 

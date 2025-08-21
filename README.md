@@ -97,9 +97,10 @@ The persona help icon next to the selector shows each persona’s description an
  - Config: set `OPENAI_MODEL` in `backend/.env` to change the default.
 
 ## Interview notes limits
-- Stored as LONGTEXT in DB (`interview_infos.context`), so no hard limit in the app.
-- API allows any string; the effective cap is the model’s context window.
-- Extremely long notes can increase latency or exceed context and may be truncated/summarized in a future release.
+ - Stored as LONGTEXT in DB (`interview_infos.context`). The practical cap is the model’s context window per request.
+ - UI shows a live counter with a soft limit (default 10,000 chars). Configure via `INTERVIEW_NOTES_SOFT_LIMIT` in `frontend/.env`.
+ - Backend enforces the same soft limit and, if exceeded, includes head + tail with a truncation marker for performance. Configure via `INTERVIEW_NOTES_SOFT_LIMIT` in `backend/.env`.
+ - Keep interview notes focused. Extremely long notes can increase latency and reduce answer quality.
 
 ## Roadmap (next steps)
 - Implement real-time transcription via Whisper or faster-whisper with VAD.

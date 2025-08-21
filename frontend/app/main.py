@@ -73,6 +73,17 @@ class MainWindow(QMainWindow):
         self.input_role.setPlaceholderText("e.g., Senior Backend Engineer")
         self.input_context.setPlaceholderText("Paste job description or notes…")
 
+        # Interview Notes soft limit + live counter
+        try:
+            self.context_limit = int(os.getenv("INTERVIEW_NOTES_SOFT_LIMIT", "10000"))
+        except Exception:
+            self.context_limit = 10000
+        self.context_counter = QLabel(f"0 / {self.context_limit:,}")
+        self.context_counter.setToolTip(
+            "Soft limit for Interview Notes. If exceeded, the backend will include a truncated head/tail for performance."
+        )
+        self.input_context.textChanged.connect(self.update_context_counter)
+
         self.btn_stop.setEnabled(False)
         self.btn_copy.setEnabled(False)
 
@@ -112,6 +123,7 @@ class MainWindow(QMainWindow):
         form.addRow("Company", self.input_company)
         form.addRow("Role", self.input_role)
         form.addRow("Interview Notes", self.input_context)
+        form.addRow("", self.context_counter)
         top.addLayout(form)
         top.addWidget(self.btn_save_info)
         top.addWidget(QLabel("Live Transcript"))
@@ -155,6 +167,8 @@ class MainWindow(QMainWindow):
         # Load models, personas and interview info
         self.load_models()
         self.load_initial_data()
+        # initialize counter after initial data load
+        self.update_context_counter()
 
     # Stealth toggle removed
 
@@ -211,6 +225,25 @@ class MainWindow(QMainWindow):
     def copy_answer(self):
         text = self.answer_view.toPlainText()
         QApplication.clipboard().setText(text)
+
+    def update_context_counter(self):
+        """Update the Interview Notes character counter and warn when exceeding soft limit."""
+        try:
+            n = len(self.input_context.toPlainText())
+            self.context_counter.setText(f"{n:,} / {self.context_limit:,}")
+            if n > self.context_limit:
+                # Warn color
+                self.context_counter.setStyleSheet("color: #b00020;")
+                self.context_counter.setToolTip(
+                    "Interview Notes exceed the soft limit; backend will truncate head/tail for speed."
+                )
+            else:
+                self.context_counter.setStyleSheet("")
+                self.context_counter.setToolTip(
+                    "Soft limit for Interview Notes. If exceeded, the backend will include a truncated head/tail for performance."
+                )
+        except Exception:
+            pass
 
     def on_persona_changed(self, idx: int):
         try:
